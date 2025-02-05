@@ -8,7 +8,7 @@ exporter_instance = None
 
 g_script_description = f"Ambiabstract batch SMD Export Tool"
 g_script_link = f"https://github.com/Ambiabstract"
-g_script_version = f"0.0.2"
+g_script_version = f"0.0.3"
 
 class SMDExporter:
     def __init__(self):
@@ -92,15 +92,17 @@ class SMDExporter:
             for i in range(1, face_count + 1):
                 verts = rt.polyOp.getFaceVerts(obj, i)
                 material_name = obj.material.name if obj.material else "default_material"
+                map_faces = rt.polyOp.getMapFace(obj, 1, i) if rt.polyOp.getNumMapVerts(obj, 1) > 0 else [0, 0, 0]
 
                 for j in range(1, len(verts) - 1):
                     indices = [verts[0], verts[j], verts[j+1]]
+                    uv_indices = [map_faces[0], map_faces[j], map_faces[j+1]]
 
                     smd_file.write(f"{material_name}\n")
-                    for idx in indices:
+                    for idx, uv_idx in zip(indices, uv_indices):
                         vert = rt.polyOp.getVert(obj, idx)
                         norm = rt.polyOp.getFaceNormal(obj, i)
-                        uv = rt.polyOp.getMapVert(obj, 1, idx) if rt.polyOp.getNumMaps(obj) > 0 else rt.Point2(0, 0)
+                        uv = rt.polyOp.getMapVert(obj, 1, uv_idx) if rt.polyOp.getNumMapVerts(obj, 1) > 0 else rt.Point2(0, 0)
 
                         smd_file.write(f"0 {vert.x} {vert.y} {vert.z} {norm.x} {norm.y} {norm.z} {uv.x} {uv.y}\n")
 
