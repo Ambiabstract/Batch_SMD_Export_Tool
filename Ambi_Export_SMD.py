@@ -3,9 +3,12 @@ import os
 
 rt = pymxs.runtime
 
+# Глобальная переменная для хранения экземпляра экспортера
+exporter_instance = None
+
 g_script_description = f"Ambiabstract batch SMD Export Tool"
 g_script_link = f"https://github.com/Ambiabstract"
-g_script_version = f"0.0.1"
+g_script_version = f"0.0.2"
 
 class SMDExporter:
     def __init__(self):
@@ -14,7 +17,7 @@ class SMDExporter:
     def create_ui(self):
         global g_script_description
         global g_script_version
-        
+
         # Создание окна
         self.dialog = rt.newRolloutFloater(f"{g_script_description} v.{g_script_version}", 400, 150)
 
@@ -35,7 +38,7 @@ class SMDExporter:
 
             on exportBtn pressed do (
                 local correctedPath = substituteString pathEdit.text "\\\\" "/"
-                python.execute("SMDExporter().export_smd('" + correctedPath + "')")
+                python.execute("exporter_instance.export_smd('" + correctedPath + "')")
             )
         )
         '''
@@ -104,4 +107,4 @@ class SMDExporter:
             smd_file.write("end\n")
 
 # Запуск экспортера
-SMDExporter()
+exporter_instance = SMDExporter()
