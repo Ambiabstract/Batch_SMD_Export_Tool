@@ -3,7 +3,7 @@ This is a Python script for 3ds Max that exports multiple objects to SMD files (
 
 Only static single-mat single-obj SMDs for now.
 
-UV is broken for now 🤕
+Smooth groups (vertex normals) is broken for now 🤕
 
 ![изображение](https://github.com/user-attachments/assets/e6cb607c-1eff-4e1e-86de-0dfa916eb75a)
 ![изображение](https://github.com/user-attachments/assets/6f266767-6f7c-466d-b8f4-04a228ce5124)
