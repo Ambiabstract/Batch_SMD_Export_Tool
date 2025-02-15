@@ -8,7 +8,7 @@ exporter_instance = None
 
 g_script_description = f"Ambiabstract batch SMD Export Tool"
 g_script_link = f"https://github.com/Ambiabstract"
-g_script_version = f"0.0.4"
+g_script_version = f"0.1.0"
 
 class SMDExporter:
     def __init__(self):
@@ -61,6 +61,41 @@ class SMDExporter:
 
         rt.messageBox("SMD Export Completed.", title="Success")
 
+    def get_vertex_normals(self, obj):
+        edit_normals_mod = rt.Edit_Normals()
+        rt.addModifier(obj, edit_normals_mod)
+        rt.modPanel.setCurrentObject(edit_normals_mod)
+        obj_tm_inverse = rt.inverse(obj.transform)
+        num_faces = rt.polyOp.getNumFaces(obj)
+        vertex_normals = {}
+        smooth_groups = {}
+        
+        for i in range(1, num_faces + 1):
+            face_verts = rt.polyOp.getFaceVerts(obj, i)
+            smooth_group = rt.polyOp.getFaceSmoothGroup(obj, i)
+            for j, vert_idx in enumerate(face_verts):
+                normal_id = rt.EditNormals.GetNormalID(edit_normals_mod, i, j + 1)
+                if normal_id != 0:
+                    normal_ws = rt.EditNormals.GetNormal(edit_normals_mod, normal_id)
+                    normal_os = normal_ws * obj_tm_inverse.rotation
+                    
+                    key = (vert_idx, smooth_group)
+                    if key not in vertex_normals:
+                        vertex_normals[key] = rt.Point3(0, 0, 0)
+                        smooth_groups[key] = 0
+                    
+                    vertex_normals[key] += normal_os
+                    smooth_groups[key] += 1
+        
+        rt.deleteModifier(obj, edit_normals_mod)
+        
+        # Усредняем нормали
+        for key in vertex_normals:
+            vertex_normals[key] /= smooth_groups[key]
+            vertex_normals[key] = rt.normalize(vertex_normals[key])
+        
+        return vertex_normals
+
     def export_object_to_smd(self, obj, output_dir):
         global g_script_description
         global g_script_link
@@ -81,20 +116,20 @@ class SMDExporter:
                 smd_file.write("nodes\n")
                 smd_file.write(f"0 \"{obj.name}\" -1\n")
                 smd_file.write("end\n")
-
                 smd_file.write("skeleton\n")
                 smd_file.write("time 0\n")
                 smd_file.write("0 0 0 0 0 0 -1.5708\n")
                 smd_file.write("end\n")
-
                 smd_file.write("triangles\n")
 
+                vertex_normals = self.get_vertex_normals(obj)
                 face_count = rt.polyOp.getNumFaces(obj)
                 for i in range(1, face_count + 1):
                     verts = rt.polyOp.getFaceVerts(obj, i)
                     material_name = obj.material.name if obj.material else "default_material"
                     map_faces = rt.polyOp.getMapFace(obj, 1, i) if rt.polyOp.getNumMapVerts(obj, 1) > 0 else [0, 0, 0]
-
+                    smooth_group = rt.polyOp.getFaceSmoothGroup(obj, i)
+                    
                     for j in range(1, len(verts) - 1):
                         indices = [verts[0], verts[j], verts[j+1]]
                         uv_indices = [map_faces[0], map_faces[j], map_faces[j+1]]
@@ -102,7 +137,7 @@ class SMDExporter:
                         smd_file.write(f"{material_name}\n")
                         for idx, uv_idx in zip(indices, uv_indices):
                             vert = rt.polyOp.getVert(obj, idx)
-                            norm = rt.polyOp.getFaceNormal(obj, i)
+                            norm = vertex_normals.get((idx, smooth_group), (0, 0, 0))
                             uv = rt.polyOp.getMapVert(obj, 1, uv_idx) if rt.polyOp.getNumMapVerts(obj, 1) > 0 else rt.Point2(0, 0)
 
                             smd_file.write(f"0 {vert.x} {vert.y} {vert.z} {norm.x} {norm.y} {norm.z} {uv.x} {uv.y}\n")
