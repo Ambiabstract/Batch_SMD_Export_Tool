@@ -8,7 +8,7 @@ exporter_instance = None
 
 g_script_description = f"Ambiabstract batch SMD Export Tool"
 g_script_link = f"https://github.com/Ambiabstract"
-g_script_version = f"0.1.1"
+g_script_version = f"0.1.2"
 
 class SMDExporter:
     def __init__(self):
@@ -66,33 +66,44 @@ class SMDExporter:
         rt.messageBox("SMD Export Completed.", title="Success")
 
     def get_vertex_normals(self, obj):
-        # Extract & average explicit normals safely.
+        # Instead of adding Edit_Normals to the original object (which can disrupt the stack),
+        # we create a snapshot of the object, convert that snapshot to Editable Poly if needed,
+        # retrieve the normals, then delete the snapshot.
+        temp_obj = rt.snapshot(obj)
+        # Make sure the snapshot is Editable Poly before using polyOp
+        if not rt.isKindOf(temp_obj, rt.Editable_Poly):
+            temp_obj = rt.convertTo(temp_obj, rt.Editable_Poly)
+
         edit_normals_mod = rt.Edit_Normals()
-        rt.addModifier(obj, edit_normals_mod)
+        rt.addModifier(temp_obj, edit_normals_mod)
         rt.modPanel.setCurrentObject(edit_normals_mod)
+
+        # We'll need the inverse transform from the original object
         obj_tm_inverse = rt.inverse(obj.transform)
-        num_faces = rt.polyOp.getNumFaces(obj)
+        num_faces = rt.polyOp.getNumFaces(temp_obj)
         vertex_normals = {}
         smooth_groups = {}
-        
+
         for i in range(1, num_faces + 1):
-            face_verts = rt.polyOp.getFaceVerts(obj, i)
-            smooth_group = rt.polyOp.getFaceSmoothGroup(obj, i)
+            face_verts = rt.polyOp.getFaceVerts(temp_obj, i)
+            smooth_group = rt.polyOp.getFaceSmoothGroup(temp_obj, i)
             for j, vert_idx in enumerate(face_verts):
                 normal_id = rt.EditNormals.GetNormalID(edit_normals_mod, i, j + 1)
                 if normal_id != 0:
                     normal_ws = rt.EditNormals.GetNormal(edit_normals_mod, normal_id)
+                    # Transform normal from world space of snapshot back to original object space.
                     normal_os = normal_ws * obj_tm_inverse.rotation
-                    
+
                     key = (vert_idx, smooth_group)
                     if key not in vertex_normals:
                         vertex_normals[key] = rt.Point3(0, 0, 0)
                         smooth_groups[key] = 0
                     vertex_normals[key] += normal_os
                     smooth_groups[key] += 1
-        
-        rt.deleteModifier(obj, edit_normals_mod)
-        
+
+        # Now delete the snapshot so the user's original object stack remains intact.
+        rt.delete(temp_obj)
+
         # Усредняем нормали
         for key in vertex_normals:
             vertex_normals[key] /= smooth_groups[key]
